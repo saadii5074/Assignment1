@@ -1,0 +1,68 @@
+import requests
+from urllib.robotparser import RobotFileParser
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, urljoin
+import json
+
+# 10 example URLs (you can replace these)
+urls = [
+    "https://www.python.org/",
+    "https://www.wikipedia.org/",
+    "https://www.mozilla.org/",
+    "https://www.nytimes.com/",
+    "https://www.bbc.com/",
+    "https://www.nationalgeographic.com/",
+    "https://edition.cnn.com/",
+    "https://www.reuters.com/",
+    "https://www.theguardian.com/international",
+    "https://www.economist.com/"
+]
+
+# Function to check robots.txt
+def is_scraping_allowed(url):
+    parsed_url = urlparse(url)
+    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    robots_url = urljoin(base_url, "/robots.txt")
+    
+    rp = RobotFileParser()
+    try:
+        rp.set_url(robots_url)
+        rp.read()
+        return rp.can_fetch("*", url)
+    except Exception as e:
+        print(f"Error checking robots.txt for {url}: {e}")
+        return False
+
+# Clean text for LLM
+def clean_text(text):
+    return ' '.join(text.split())
+
+# Scrape function
+scraped_data = []
+
+for url in urls:
+    print(f"Checking: {url}")
+    if is_scraping_allowed(url):
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, "html.parser")
+                text = soup.get_text()
+                cleaned = clean_text(text)
+                scraped_data.append({
+                    "url": url,
+                    "content": cleaned
+                })
+                print(f"✅ Scraped: {url}")
+            else:
+                print(f"❌ Failed to fetch: {url} (Status: {response.status_code})")
+        except Exception as e:
+            print(f"❌ Error scraping {url}: {e}")
+    else:
+        print(f"🚫 Not allowed to scrape: {url} (robots.txt blocked)")
+
+# Save as JSON
+with open("scraped_data_llm_ready.json", "w", encoding="utf-8") as f:
+    json.dump(scraped_data, f, ensure_ascii=False, indent=2)
+
+print("\n🎉 Finished! Data saved to scraped_data_llm_ready.json")
